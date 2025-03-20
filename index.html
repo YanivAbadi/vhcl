@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בדיקת תאריך טסט אחרון</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: right;
+        }
+        .container {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+            display: none;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>בדיקת תאריך טסט אחרון לרכב</h1>
+        <div class="form-group">
+            <label for="vehicleNumber">מספר רכב:</label>
+            <input type="text" id="vehicleNumber" placeholder="הזן מספר רכב" maxlength="8">
+        </div>
+        <button id="searchButton" onclick="searchVehicle()">
+            <span id="loadingIndicator" class="loading"></span>
+            חפש רכב
+        </button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function formatDate(dateString) {
+            if (!dateString) return "לא נמצא תאריך";
+            
+            const date = new Date(dateString);
+            return date.toLocaleDateString('he-IL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
+        function showLoading(isLoading) {
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const searchButton = document.getElementById('searchButton');
+            
+            if (isLoading) {
+                loadingIndicator.style.display = 'inline-block';
+                searchButton.disabled = true;
+            } else {
+                loadingIndicator.style.display = 'none';
+                searchButton.disabled = false;
+            }
+        }
+
+        function showResult(message, isSuccess) {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = message;
+            resultElement.style.display = 'block';
+            
+            if (isSuccess) {
+                resultElement.className = 'success';
+            } else {
+                resultElement.className = 'error';
+            }
+        }
+
+        function searchVehicle() {
+            const vehicleNumber = document.getElementById('vehicleNumber').value.trim();
+            
+            if (!vehicleNumber) {
+                showResult('אנא הזן מספר רכב', false);
+                return;
+            }
+            
+            showLoading(true);
+            showResult('', false);
+            
+            const apiUrl = `https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q=${vehicleNumber}`;
+            
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('תקלה בתקשורת עם השרת');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    showLoading(false);
+                    
+                    if (data.success && data.result && data.result.records && data.result.records.length > 0) {
+                        // חיפוש הרכב הספציפי בתוצאות
+                        const vehicle = data.result.records.find(record => 
+                            record.mispar_rechev && record.mispar_rechev.toString() === vehicleNumber);
+                        
+                        if (vehicle) {
+                            const testDate = formatDate(vehicle.mivchan_acharon_dt);
+                            showResult(`תאריך הטסט האחרון של רכב מספר ${vehicleNumber} הוא: ${testDate}`, true);
+                        } else {
+                            showResult(`רכב מספר ${vehicleNumber} לא נמצא במאגר`, false);
+                        }
+                    } else {
+                        showResult(`רכב מספר ${vehicleNumber} לא נמצא במאגר`, false);
+                    }
+                })
+                .catch(error => {
+                    showLoading(false);
+                    showResult(`שגיאה בחיפוש: ${error.message}`, false);
+                    console.error('Error:', error);
+                });
+        }
+
+        // הוספת אפשרות לחיפוש בלחיצה על Enter
+        document.getElementById('vehicleNumber').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                searchVehicle();
+            }
+        });
+    </script>
+</body>
+</html>
